@@ -60,8 +60,11 @@ def update_model(state, grads):
 	return state.apply_gradients(grads=grads)	
 
 class Trainer:
-	def __init__(self, config):
-		self.run = wandb.init(project='DeepShampoo-Exploration', entity='ramit-projects')
+	def __init__(self, config, wandb_kwargs = {}):
+		self.run = wandb.init(
+			project='DeepShampoo-Exploration', entity='ramit-projects',
+			**wandb_kwargs
+		)
 		self.config = config
 
 	def train_epoch(self, state, train_ds, batch_size, rng):
@@ -124,15 +127,26 @@ class Trainer:
 					test_loss = test_loss,
 					test_acc = test_accuracy
 				)
+
+				self.run.log({
+					'train_loss' : train_loss,
+					'train_acc' : train_accuracy,
+					'test_loss' : test_loss,
+					'test_acc' : test_accuracy
+				})
 		return state
 
 def main():
 	trainer = Trainer(config = dotdict({
-		"num_epochs" : 5,
+		"num_epochs" : 10,
 		"learning_rate" : 1e-4,
 		"momentum" : 0.95,
 		'batch_size' : 64
-	}))
+	}),
+	wandb_kwargs = {
+		'tags' : ['SGD']
+	}
+	)
 
 	trainer.train_and_evaluate()
 
