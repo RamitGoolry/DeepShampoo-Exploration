@@ -1,4 +1,4 @@
 default: main
 
 main:
-	python3 main.py
+	XLA_PYTHON_CLIENT_MEM_FRACTION=0.5 python3 main.py
