@@ -63,9 +63,9 @@ class Trainer:
 	def __init__(self, config, wandb_kwargs = {}):
 		self.run = wandb.init(
 			project='DeepShampoo-Exploration', entity='ramit-projects',
-			**wandb_kwargs
+			config = config, **wandb_kwargs
 		)
-		self.config = config
+		self.config = self.run.config
 
 	def train_epoch(self, state, train_ds, batch_size, rng):
 		"""Train for a single epoch."""
@@ -138,7 +138,7 @@ class Trainer:
 
 def main():
 	trainer = Trainer(config = dotdict({
-		"num_epochs" : 10,
+		"num_epochs" : 25,
 		"learning_rate" : 1e-4,
 		"momentum" : 0.95,
 		'batch_size' : 64
