@@ -154,15 +154,16 @@ class Trainer:
 		return state
 
 def main():
-	trainer = Trainer(config = dotdict({
-		"num_epochs" : 25,
-		"learning_rate" : 1e-4,
-		"momentum" : 0.95,
-		'batch_size' : 64
-	}),
-	wandb_kwargs = {
-		'tags' : ['SGD']
-	}
+	trainer = Trainer(
+		config = dotdict({
+			"num_epochs" : 25,
+			"learning_rate" : 1e-4,
+			"momentum" : 0.95,
+			'batch_size' : 64
+		}),
+		wandb_kwargs = {
+			'tags' : ['SGD']
+		}
 	)
 
 	trainer.train_and_evaluate()
