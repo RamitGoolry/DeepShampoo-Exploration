@@ -10,6 +10,10 @@ from tqdm import tqdm
 import tensorflow_datasets as tfds
 import wandb
 
+# =============================
+#     	Data Structures
+# =============================
+
 class dotdict(dict):
 	"""
 	Dot notation to access dictionary attributes
@@ -17,6 +21,10 @@ class dotdict(dict):
 	__getattr__ = dict.get
 	__setattr__ = dict.__setitem__
 	__delattr__ = dict.__delitem__
+
+# ==============================
+#          Models
+# ==============================
 
 class Model(nn.Module):
     @nn.compact
@@ -30,16 +38,6 @@ class Model(nn.Module):
         x = nn.Dense(10)(x)
 
         return x
-
-def get_datasets():
-	"""Load MNIST train and test datasets into memory."""
-	ds_builder = tfds.builder('mnist')
-	ds_builder.download_and_prepare()
-	train_ds = tfds.as_numpy(ds_builder.as_dataset(split='train', batch_size=-1))
-	test_ds = tfds.as_numpy(ds_builder.as_dataset(split='test', batch_size=-1))
-	train_ds['image'] = jnp.float32(train_ds['image']) / 255.
-	test_ds['image'] = jnp.float32(test_ds['image']) / 255.
-	return train_ds, test_ds
 
 @jax.jit
 def apply_model(state, images, labels):
@@ -57,7 +55,26 @@ def apply_model(state, images, labels):
 
 @jax.jit
 def update_model(state, grads):
-	return state.apply_gradients(grads=grads)	
+	return state.apply_gradients(grads=grads)
+
+# ==============================
+#      		Data
+# ==============================
+
+def get_datasets():
+	"""Load MNIST train and test datasets into memory."""
+	ds_builder = tfds.builder('mnist')
+	ds_builder.download_and_prepare()
+	train_ds = tfds.as_numpy(ds_builder.as_dataset(split='train', batch_size=-1))
+	test_ds = tfds.as_numpy(ds_builder.as_dataset(split='test', batch_size=-1))
+	train_ds['image'] = jnp.float32(train_ds['image']) / 255.
+	test_ds['image'] = jnp.float32(test_ds['image']) / 255.
+	return train_ds, test_ds
+
+# ==============================
+#         Training
+# ==============================
+
 
 class Trainer:
 	def __init__(self, config, wandb_kwargs = {}):
