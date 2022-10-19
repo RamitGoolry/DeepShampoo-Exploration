@@ -10,8 +10,10 @@ from tqdm import tqdm
 import tensorflow_datasets as tfds
 import wandb
 
+from distributed_shampoo import distributed_shampoo
+
 # =============================
-#     	Data Structures
+#	 	Data Structures
 # =============================
 
 class dotdict(dict):
@@ -23,24 +25,24 @@ class dotdict(dict):
 	__delattr__ = dict.__delitem__
 
 # ==============================
-#          Models
+#		  Models
 # ==============================
 
 class Model(nn.Module):
-    @nn.compact
-    def __call__(self, x):
-        x = x.reshape((x.shape[0], -1))
+	@nn.compact
+	def __call__(self, x):
+		x = x.reshape((x.shape[0], -1))
 
-        x = nn.Dense(512)(x)
-        x = nn.relu(x)
-        x = nn.Dense(100)(x)
-        x = nn.relu(x)
-        x = nn.Dense(10)(x)
+		x = nn.Dense(512)(x)
+		x = nn.relu(x)
+		x = nn.Dense(100)(x)
+		x = nn.relu(x)
+		x = nn.Dense(10)(x)
 
-        return x
+		return x
 
 @jax.jit
-def apply_model(state, images, labels):
+def apply_model(state : train_state.TrainState, images, labels):
 	"""Computes gradients, loss and accuracy for a single batch."""
 	def loss_fn(params):
 		logits = state.apply_fn({'params': params}, images)
@@ -54,11 +56,11 @@ def apply_model(state, images, labels):
 	return grads, loss, accuracy
 
 @jax.jit
-def update_model(state, grads):
+def update_model(state : train_state.TrainState, grads):
 	return state.apply_gradients(grads=grads)
 
 # ==============================
-#      		Data
+#	  		Data
 # ==============================
 
 def get_datasets():
@@ -72,7 +74,7 @@ def get_datasets():
 	return train_ds, test_ds
 
 # ==============================
-#         Training
+#		 Training
 # ==============================
 
 
@@ -107,14 +109,14 @@ class Trainer:
 		train_accuracy = np.mean(epoch_accuracy)
 		return state, train_loss, train_accuracy
 
-	def create_train_state(self, rng):
+	def create_train_state(self, rng) -> train_state.TrainState:
 		"""Creates initial `TrainState`."""
 		model = Model()
 		params = model.init(rng, jnp.ones([1, 28, 28, 1]))['params']
-		tx = optax.sgd(self.config.learning_rate, self.config.momentum)
+		tx = distributed_shampoo(self.config.learning_rate)
 		return train_state.TrainState.create(
 			apply_fn=model.apply, params=params, tx=tx)
-		
+
 	def train_and_evaluate(self) -> train_state.TrainState:
 		"""Execute model training and evaluation loop.
 		Args:
