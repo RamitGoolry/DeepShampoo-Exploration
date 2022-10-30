@@ -11,6 +11,7 @@ import tensorflow_datasets as tfds
 import wandb
 
 from distributed_shampoo import distributed_shampoo
+from icecream import ic
 
 # =============================
 #	 	Data Structures
