@@ -10,6 +10,13 @@ from tqdm import tqdm
 import tensorflow_datasets as tfds
 import wandb
 
+from distributed_shampoo import distributed_shampoo
+from icecream import ic
+
+# =============================
+#	 	Data Structures
+# =============================
+
 class dotdict(dict):
 	"""
 	Dot notation to access dictionary attributes
@@ -18,31 +25,25 @@ class dotdict(dict):
 	__setattr__ = dict.__setitem__
 	__delattr__ = dict.__delitem__
 
+# ==============================
+#		  Models
+# ==============================
+
 class Model(nn.Module):
-    @nn.compact
-    def __call__(self, x):
-        x = x.reshape((x.shape[0], -1))
+	@nn.compact
+	def __call__(self, x):
+		x = x.reshape((x.shape[0], -1))
 
-        x = nn.Dense(512)(x)
-        x = nn.relu(x)
-        x = nn.Dense(100)(x)
-        x = nn.relu(x)
-        x = nn.Dense(10)(x)
+		x = nn.Dense(512)(x)
+		x = nn.relu(x)
+		x = nn.Dense(100)(x)
+		x = nn.relu(x)
+		x = nn.Dense(10)(x)
 
-        return x
-
-def get_datasets():
-	"""Load MNIST train and test datasets into memory."""
-	ds_builder = tfds.builder('mnist')
-	ds_builder.download_and_prepare()
-	train_ds = tfds.as_numpy(ds_builder.as_dataset(split='train', batch_size=-1))
-	test_ds = tfds.as_numpy(ds_builder.as_dataset(split='test', batch_size=-1))
-	train_ds['image'] = jnp.float32(train_ds['image']) / 255.
-	test_ds['image'] = jnp.float32(test_ds['image']) / 255.
-	return train_ds, test_ds
+		return x
 
 @jax.jit
-def apply_model(state, images, labels):
+def apply_model(state : train_state.TrainState, images, labels):
 	"""Computes gradients, loss and accuracy for a single batch."""
 	def loss_fn(params):
 		logits = state.apply_fn({'params': params}, images)
@@ -56,8 +57,27 @@ def apply_model(state, images, labels):
 	return grads, loss, accuracy
 
 @jax.jit
-def update_model(state, grads):
-	return state.apply_gradients(grads=grads)	
+def update_model(state : train_state.TrainState, grads):
+	return state.apply_gradients(grads=grads)
+
+# ==============================
+#	  		Data
+# ==============================
+
+def get_datasets():
+	"""Load MNIST train and test datasets into memory."""
+	ds_builder = tfds.builder('mnist')
+	ds_builder.download_and_prepare()
+	train_ds = tfds.as_numpy(ds_builder.as_dataset(split='train', batch_size=-1))
+	test_ds = tfds.as_numpy(ds_builder.as_dataset(split='test', batch_size=-1))
+	train_ds['image'] = jnp.float32(train_ds['image']) / 255.
+	test_ds['image'] = jnp.float32(test_ds['image']) / 255.
+	return train_ds, test_ds
+
+# ==============================
+#		 Training
+# ==============================
+
 
 class Trainer:
 	def __init__(self, config, wandb_kwargs = {}):
@@ -90,14 +110,14 @@ class Trainer:
 		train_accuracy = np.mean(epoch_accuracy)
 		return state, train_loss, train_accuracy
 
-	def create_train_state(self, rng):
+	def create_train_state(self, rng) -> train_state.TrainState:
 		"""Creates initial `TrainState`."""
 		model = Model()
 		params = model.init(rng, jnp.ones([1, 28, 28, 1]))['params']
-		tx = optax.sgd(self.config.learning_rate, self.config.momentum)
+		tx = distributed_shampoo(self.config.learning_rate)
 		return train_state.TrainState.create(
 			apply_fn=model.apply, params=params, tx=tx)
-		
+
 	def train_and_evaluate(self) -> train_state.TrainState:
 		"""Execute model training and evaluation loop.
 		Args:
@@ -137,15 +157,16 @@ class Trainer:
 		return state
 
 def main():
-	trainer = Trainer(config = dotdict({
-		"num_epochs" : 25,
-		"learning_rate" : 1e-4,
-		"momentum" : 0.95,
-		'batch_size' : 64
-	}),
-	wandb_kwargs = {
-		'tags' : ['SGD']
-	}
+	trainer = Trainer(
+		config = dotdict({
+			"num_epochs" : 25,
+			"learning_rate" : 1e-4,
+			"momentum" : 0.95,
+			'batch_size' : 64
+		}),
+		wandb_kwargs = {
+			'tags' : ['SGD']
+		}
 	)
 
 	trainer.train_and_evaluate()
